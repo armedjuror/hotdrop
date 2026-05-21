@@ -1,6 +1,6 @@
 {
   "name": "hotdrop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "P2P LAN & internet file sharing via WebRTC — no cloud, no installs, just a URL",
   "preferGlobal": true,
   "bin": {
