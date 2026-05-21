@@ -386,6 +386,26 @@
     @media (max-width: 400px) {
       .room-code { font-size: 2.2rem; }
     }
+   footer {
+     position: relative;
+     z-index: 1;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     flex-wrap: wrap;
+     gap: 16px;
+     padding: 20px;
+     border-top: 1px solid var(--border);
+     font-size: 0.72rem;
+   }
+
+   footer a {
+     color: var(--muted);
+     text-decoration: none;
+     transition: color 0.15s;
+   }
+
+   footer a:hover { color: var(--text); }
   </style>
 </head>
 <body>
@@ -407,7 +427,7 @@
       <div class="home-hero">
         <div class="hero-icon">🔥</div>
         <h1>Drop anything, anywhere</h1>
-        <p>Send files directly between devices — no cloud, no cables, no account needed.</p>
+        <p>Send files directly between devices peer to peer — no cloud, no cables, no account needed.</p>
       </div>
       <div class="home-actions">
         <button class="btn-primary" id="btn-create">
@@ -482,6 +502,13 @@
 </div>
 
 <div id="toast"></div>
+
+<footer>
+  <a href="https://github.com/armedjuror/hotdrop" target="_blank" rel="noopener">GitHub</a>
+  <a href="https://github.com/armedjuror/hotdrop" target="_blank" rel="noopener"><span id="star-count">—</span> ⭐</a>
+  <span>by <a href="https://github.com/armedjuror" target="_blank" rel="noopener">armedjuror</a></span>
+  <a href="https://buymeacoffee.com/armedjuror" target="_blank" rel="noopener">☕ Buy me a coffee</a>
+</footer>
 
 <script>
 // ─────────────────────────────────────────────
@@ -960,6 +987,13 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 
 // Init
 checkAutoJoin();
+
+fetch('https://api.github.com/repos/armedjuror/hotdrop')
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('star-count').textContent = data.stargazers_count;
+  });
+
 </script>
 </body>
 </html>
