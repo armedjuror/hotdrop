@@ -386,26 +386,57 @@
     @media (max-width: 400px) {
       .room-code { font-size: 2.2rem; }
     }
+
    footer {
-     position: relative;
-     z-index: 1;
-     display: flex;
-     align-items: center;
-     justify-content: center;
-     flex-wrap: wrap;
-     gap: 16px;
-     padding: 20px;
-     border-top: 1px solid var(--border);
-     font-size: 0.72rem;
-   }
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 12px 20px;
+}
 
-   footer a {
-     color: var(--muted);
-     text-decoration: none;
-     transition: color 0.15s;
-   }
+.footer-inner {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 
-   footer a:hover { color: var(--text); }
+.footer-brand {
+  font-size: 0.72rem;
+}
+
+.footer-brand span { color: var(--accent); font-weight: 700; }
+
+.footer-brand a { color: var(--accent); text-decoration: none; }
+.footer-brand a:hover { color: var(--text); }
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-btn {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 4px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.footer-btn:hover { color: var(--text); border-color: #444; }
+
+.footer-btn.coffee { color: #f5a623; border-color: #f5a623; }
+.footer-btn.coffee:hover { background: rgba(245,166,35,0.08); }
   </style>
 </head>
 <body>
@@ -504,12 +535,18 @@
 <div id="toast"></div>
 
 <footer>
-  <a href="https://github.com/armedjuror/hotdrop" target="_blank" rel="noopener">GitHub</a>
-  <a href="https://github.com/armedjuror/hotdrop" target="_blank" rel="noopener"><span id="star-count">—</span> ⭐</a>
-  <span>by <a href="https://github.com/armedjuror" target="_blank" rel="noopener">armedjuror</a></span>
-  <a href="https://buymeacoffee.com/armedjuror" target="_blank" rel="noopener">☕ Buy me a coffee</a>
+  <div class="footer-inner">
+    <span class="footer-brand">Hot<span>Drop</span> — built by <a href="https://github.com/armedjuror" target="_blank" rel="noopener">armedjuror</a></span>
+    <div class="footer-actions">
+      <a href="https://github.com/armedjuror/hotdrop-webrtc" target="_blank" rel="noopener" class="footer-btn">
+        Github ⭐ <span id="star-count">—</span>
+      </a>
+      <a href="https://buymeacoffee.com/armedjuror" target="_blank" rel="noopener" class="footer-btn coffee">
+        ☕ Buy me a coffee
+      </a>
+    </div>
+  </div>
 </footer>
-
 <script>
 // ─────────────────────────────────────────────
 // Config — auto-detects same-origin (Railway) or localhost for dev
