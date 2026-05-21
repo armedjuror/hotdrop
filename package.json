@@ -1,0 +1,15 @@
+{
+  "name": "hotdrop-webrtc",
+  "version": "1.0.0",
+  "description": "P2P file transfer via WebRTC — no installs, just open a URL",
+  "main": "signaling/server.js",
+  "scripts": {
+    "start": "node signaling/server.js"
+  },
+  "keywords": ["webrtc", "file-transfer", "p2p", "hotdrop"],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.18.2"
+  }
+}

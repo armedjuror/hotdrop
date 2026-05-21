@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HotDrop</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HotDrop" />
+  <link rel="apple-touch-icon" href="/icon-192.svg" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111;
+      --surface2: #161616;
+      --border: #222;
+      --accent: #e8ff47;
+      --accent2: #47c8ff;
+      --text: #f0f0f0;
+      --muted: #555;
+      --danger: #ff4747;
+      --success: #47ff9a;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ── */
+    .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100dvh; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo { font-family: var(--sans); font-weight: 800; font-size: 1.4rem; letter-spacing: -0.03em; }
+    .logo span { color: var(--accent); }
+
+    .conn-badge {
+      font-size: 0.62rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 2px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      transition: all 0.3s;
+    }
+    .conn-badge.connecting { color: var(--accent2); border-color: var(--accent2); }
+    .conn-badge.connected  { color: var(--success);  border-color: var(--success); animation: pulse 2s infinite; }
+    .conn-badge.error      { color: var(--danger);   border-color: var(--danger); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+    main { flex: 1; padding: 24px 20px 40px; max-width: 600px; width: 100%; margin: 0 auto; }
+
+    /* ── Screens ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── Home screen ── */
+    .home-hero {
+      text-align: center;
+      padding: 32px 0 40px;
+    }
+    .home-hero .hero-icon { font-size: 3.5rem; margin-bottom: 16px; }
+    .home-hero h1 { font-family: var(--sans); font-size: 1.6rem; font-weight: 800; margin-bottom: 8px; }
+    .home-hero p { font-size: 0.78rem; color: var(--muted); line-height: 1.7; max-width: 320px; margin: 0 auto; }
+
+    .home-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 32px; }
+
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 16px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:active { opacity: 0.75; }
+
+    .btn-secondary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 16px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-secondary:hover { border-color: #444; background: var(--surface); }
+
+    /* ── Create screen ── */
+    .room-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .room-card-header {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .room-code {
+      font-family: var(--sans);
+      font-size: 2.8rem;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .qr-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .qr-wrap img {
+      width: 180px;
+      height: 180px;
+      border-radius: 6px;
+    }
+
+    .waiting-msg {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .dot-pulse {
+      display: inline-flex;
+      gap: 4px;
+    }
+    .dot-pulse span {
+      width: 5px;
+      height: 5px;
+      background: var(--muted);
+      border-radius: 50%;
+      animation: dotbounce 1.2s infinite;
+    }
+    .dot-pulse span:nth-child(2) { animation-delay: 0.2s; }
+    .dot-pulse span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotbounce { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+    /* ── Join screen ── */
+    .join-form { margin-bottom: 20px; }
+    .join-form label { display: block; font-size: 0.72rem; color: var(--muted); margin-bottom: 8px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+    .code-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: var(--sans);
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      text-align: center;
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 12px;
+    }
+    .code-input:focus { border-color: var(--accent); }
+    .code-input::placeholder { color: var(--border); letter-spacing: 0.1em; }
+
+    .error-msg {
+      font-size: 0.75rem;
+      color: var(--danger);
+      text-align: center;
+      margin-bottom: 12px;
+      min-height: 18px;
+    }
+
+    /* ── Transfer screen ── */
+    .peer-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--success);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 0.78rem;
+    }
+    .peer-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; flex-shrink: 0; animation: pulse 2s infinite; }
+    .peer-info span { color: var(--muted); }
+    .peer-info strong { color: var(--success); }
+
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .drop-zone.drag-over { border-color: var(--accent); background: rgba(232,255,71,.04); }
+    .drop-zone input { position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
+    .drop-icon { font-size: 2.2rem; margin-bottom: 10px; }
+    .drop-zone h3 { font-family: var(--sans); font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+    .drop-zone p { font-size: 0.72rem; color: var(--muted); }
+
+    /* Transfer items */
+    .transfers { display: flex; flex-direction: column; gap: 10px; }
+
+    .transfer-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .transfer-item.incoming { border-color: #1a2a1a; }
+    .transfer-item.outgoing { border-color: #1a1a2a; }
+    .transfer-item.done { border-color: var(--border); }
+
+    .transfer-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .transfer-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+    .transfer-meta { flex: 1; min-width: 0; }
+    .transfer-name { font-size: 0.8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .transfer-sub { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+
+    .transfer-status { font-size: 0.7rem; flex-shrink: 0; }
+    .transfer-status.incoming-lbl { color: var(--accent2); }
+    .transfer-status.outgoing-lbl { color: var(--accent); }
+    .transfer-status.done-lbl { color: var(--success); }
+    .transfer-status.err-lbl { color: var(--danger); }
+
+    .progress-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 2px; transition: width 0.15s; }
+    .progress-fill.incoming-fill { background: var(--accent2); }
+    .progress-fill.outgoing-fill { background: var(--accent); }
+
+    .download-btn {
+      margin-top: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--success);
+      color: #000;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-sm-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-sm-ghost:hover { color: var(--text); border-color: #444; }
+
+    .section-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-title { font-family: var(--sans); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+    /* ── Install banner ── */
+    #install-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 0.78rem;
+    }
+    #install-banner.visible { display: flex; }
+    #install-banner span { color: var(--accent); }
+    .btn-install { background: var(--accent); color: #000; border: none; padding: 7px 14px; font-family: var(--mono); font-size: 0.72rem; font-weight: 700; cursor: pointer; border-radius: 3px; white-space: nowrap; flex-shrink: 0; }
+
+    /* ── Disconnect banner ── */
+    .disconnected-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--danger);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 0.78rem;
+      color: var(--danger);
+    }
+    .disconnected-banner.visible { display: flex; }
+
+    /* ── Toast ── */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 6px; font-size: 0.75rem; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 999; white-space: nowrap; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.success { border-color: var(--success); color: var(--success); }
+    #toast.error   { border-color: var(--danger);  color: var(--danger); }
+
+    /* ── Back button ── */
+    .back-btn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-family: var(--mono); font-size: 0.75rem; padding: 0; margin-bottom: 20px; display: flex; align-items: center; gap: 6px; transition: color 0.15s; }
+    .back-btn:hover { color: var(--text); }
+
+    @media (max-width: 400px) {
+      .room-code { font-size: 2.2rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">Hot<span>Drop</span></div>
+    <span class="conn-badge" id="conn-badge">idle</span>
+  </header>
+
+  <main>
+    <!-- Install banner -->
+    <div id="install-banner">
+      <p>Install <span>HotDrop</span> for quick access</p>
+      <button class="btn-install" id="install-btn">Install</button>
+    </div>
+
+    <!-- ── Screen: Home ── -->
+    <div class="screen active" id="screen-home">
+      <div class="home-hero">
+        <div class="hero-icon">🔥</div>
+        <h1>Drop anything, anywhere</h1>
+        <p>Send files directly between devices — no cloud, no cables, no account needed.</p>
+      </div>
+      <div class="home-actions">
+        <button class="btn-primary" id="btn-create">
+          <span>⚡</span> Create Room
+        </button>
+        <button class="btn-secondary" id="btn-join-nav">
+          <span>🔗</span> Join with Code
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Screen: Create ── -->
+    <div class="screen" id="screen-create">
+      <button class="back-btn" id="back-from-create">← back</button>
+      <div class="room-card">
+        <div class="room-card-header">Room code</div>
+        <div class="room-code" id="room-code">——</div>
+        <div class="qr-wrap" id="qr-wrap">
+          <span style="color:var(--muted);font-size:0.75rem">generating…</span>
+        </div>
+        <div class="waiting-msg">
+          Waiting for someone to join
+          <span class="dot-pulse"><span></span><span></span><span></span></span>
+        </div>
+      </div>
+      <p style="font-size:0.72rem;color:var(--muted);text-align:center;line-height:1.7">
+        Share the code or let them scan the QR.<br/>Both devices need this page open.
+      </p>
+    </div>
+
+    <!-- ── Screen: Join ── -->
+    <div class="screen" id="screen-join">
+      <button class="back-btn" id="back-from-join">← back</button>
+      <div class="join-form">
+        <label>Enter room code</label>
+        <input class="code-input" id="code-input" maxlength="6" placeholder="XXXXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+        <div class="error-msg" id="join-error"></div>
+        <button class="btn-primary" id="btn-join">
+          <span>🔗</span> Join Room
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Screen: Transfer ── -->
+    <div class="screen" id="screen-transfer">
+      <div class="disconnected-banner" id="disconnected-banner">
+        <span>⚠ Peer disconnected</span>
+        <button class="btn-sm-ghost" id="btn-new-session">New session</button>
+      </div>
+
+      <div class="peer-info" id="peer-info">
+        <span class="peer-dot"></span>
+        <span>Connected · <strong>peer ready</strong></span>
+      </div>
+
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" multiple />
+        <div class="drop-icon">⬆</div>
+        <h3>Send files</h3>
+        <p>Drop here or tap to browse</p>
+      </div>
+
+      <div id="transfers-wrap" style="display:none">
+        <div class="section-row">
+          <span class="section-title">Transfers</span>
+          <button class="btn-sm-ghost" id="clear-transfers">clear</button>
+        </div>
+        <div class="transfers" id="transfers"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// Config — auto-detects same-origin (Railway) or localhost for dev
+// ─────────────────────────────────────────────
+const WS_URL = (() => {
+  const host = window.location.hostname;
+  
+  
+  if (host === 'localhost' || host === '127.0.0.1') return 'ws://localhost:8080';
+  return `wss://${host}`;  // same-origin deploy on Railway
+})();
+
+const CHUNK_SIZE = 64 * 1024; // 64KB chunks
+
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let ws = null;
+let pc = null;           // RTCPeerConnection
+let dc = null;           // RTCDataChannel
+let myRole = null;       // 'creator' | 'joiner'
+let roomCode = null;
+
+// Incoming file assembly
+let incomingMeta = null;
+let incomingChunks = [];
+let incomingReceived = 0;
+
+// Transfer list
+const transferMap = new Map(); // id → { el, meta }
+
+// ─────────────────────────────────────────────
+// Screen management
+// ─────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+// Badge
+// ─────────────────────────────────────────────
+function setBadge(text, cls) {
+  const el = document.getElementById('conn-badge');
+  el.textContent = text;
+  el.className = 'conn-badge' + (cls ? ' ' + cls : '');
+}
+
+// ─────────────────────────────────────────────
+// WebSocket connection to signaling server
+// ─────────────────────────────────────────────
+function connectWS(onOpen) {
+  setBadge('connecting', 'connecting');
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    setBadge('signaling', 'connecting');
+    onOpen();
+  };
+
+  ws.onmessage = e => handleSignal(JSON.parse(e.data));
+
+  ws.onerror = () => {
+    setBadge('error', 'error');
+    showToast('Cannot reach signaling server', 'error');
+  };
+
+  ws.onclose = () => {
+    if (dc && dc.readyState === 'open') return; // WebRTC already up, WS not needed
+    setBadge('disconnected', 'error');
+  };
+}
+
+function wsSend(data) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
+}
+
+// ─────────────────────────────────────────────
+// Signaling handler
+// ─────────────────────────────────────────────
+async function handleSignal(msg) {
+  switch (msg.type) {
+    case 'created':
+      roomCode = msg.code;
+      document.getElementById('room-code').textContent = msg.code;
+      renderQR(msg.code);
+      break;
+
+    case 'joined':
+      roomCode = msg.code;
+      break;
+
+    case 'peer_joined':
+      // Creator: peer joined — initiate WebRTC offer
+      if (myRole === 'creator') {
+        setBadge('connecting', 'connecting');
+        await createPeerConnection();
+        dc = pc.createDataChannel('hotdrop', { ordered: true });
+        setupDataChannel(dc);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        wsSend({ type: 'offer', sdp: offer.sdp });
+      }
+      break;
+
+    case 'offer':
+      // Joiner: got offer — answer it
+      await createPeerConnection();
+      await pc.setRemoteDescription({ type: 'offer', sdp: msg.sdp });
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      wsSend({ type: 'answer', sdp: answer.sdp });
+      pc.ondatachannel = e => { dc = e.channel; setupDataChannel(dc); };
+      break;
+
+    case 'answer':
+      await pc.setRemoteDescription({ type: 'answer', sdp: msg.sdp });
+      break;
+
+    case 'ice':
+      if (msg.candidate && pc) {
+        try { await pc.addIceCandidate(msg.candidate); } catch (_) {}
+      }
+      break;
+
+    case 'peer_left':
+      onPeerDisconnected();
+      break;
+
+    case 'error':
+      document.getElementById('join-error').textContent = msg.message;
+      setBadge('idle');
+      break;
+  }
+}
+
+// ─────────────────────────────────────────────
+// WebRTC
+// ─────────────────────────────────────────────
+async function createPeerConnection() {
+  pc = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  });
+
+  pc.onicecandidate = e => {
+    if (e.candidate) wsSend({ type: 'ice', candidate: e.candidate });
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'connected') {
+      setBadge('connected', 'connected');
+    } else if (['disconnected','failed','closed'].includes(pc.connectionState)) {
+      onPeerDisconnected();
+    }
+  };
+}
+
+function setupDataChannel(channel) {
+  channel.binaryType = 'arraybuffer';
+
+  channel.onopen = () => {
+    setBadge('connected', 'connected');
+    showScreen('transfer');
+    showToast('Connected! Ready to send files.', 'success');
+  };
+
+  channel.onclose = () => onPeerDisconnected();
+
+  channel.onmessage = e => handleDataMessage(e.data);
+}
+
+function onPeerDisconnected() {
+  setBadge('disconnected', 'error');
+  const banner = document.getElementById('disconnected-banner');
+  banner.classList.add('visible');
+  const dropZone = document.getElementById('drop-zone');
+  dropZone.style.pointerEvents = 'none';
+  dropZone.style.opacity = '0.4';
+}
+
+// ─────────────────────────────────────────────
+// Data channel messages
+// ─────────────────────────────────────────────
+function handleDataMessage(data) {
+  if (typeof data === 'string') {
+    const msg = JSON.parse(data);
+
+    if (msg.type === 'file-start') {
+      incomingMeta = msg;
+      incomingChunks = [];
+      incomingReceived = 0;
+      addTransferItem(msg.id, msg.name, msg.size, 'incoming');
+    }
+
+    if (msg.type === 'file-end') {
+      const blob = new Blob(incomingChunks, { type: incomingMeta.mime || 'application/octet-stream' });
+      updateTransferDone(incomingMeta.id, blob, incomingMeta.name);
+      incomingMeta = null;
+      incomingChunks = [];
+      incomingReceived = 0;
+    }
+
+  } else {
+    // Binary chunk
+    if (!incomingMeta) return;
+    incomingChunks.push(data);
+    incomingReceived += data.byteLength;
+    const pct = Math.min(100, Math.round(incomingReceived / incomingMeta.size * 100));
+    updateTransferProgress(incomingMeta.id, pct);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Send files
+// ─────────────────────────────────────────────
+async function sendFiles(files) {
+  if (!dc || dc.readyState !== 'open') {
+    showToast('Not connected', 'error');
+    return;
+  }
+
+  for (const file of files) {
+    const id = Math.random().toString(36).slice(2, 10);
+    addTransferItem(id, file.name, file.size, 'outgoing');
+
+    // Send metadata
+    dc.send(JSON.stringify({
+      type: 'file-start',
+      id, name: file.name, size: file.size, mime: file.type
+    }));
+
+    // Send chunks
+    const buffer = await file.arrayBuffer();
+    let offset = 0;
+    let sent = 0;
+
+    while (offset < buffer.byteLength) {
+      // Backpressure — wait if buffer is too full
+      while (dc.bufferedAmount > 1024 * 1024) {
+        await new Promise(r => setTimeout(r, 20));
+      }
+      const chunk = buffer.slice(offset, offset + CHUNK_SIZE);
+      dc.send(chunk);
+      offset += chunk.byteLength;
+      sent += chunk.byteLength;
+      const pct = Math.min(100, Math.round(sent / file.size * 100));
+      updateTransferProgress(id, pct);
+    }
+
+    // Send end signal
+    dc.send(JSON.stringify({ type: 'file-end', id }));
+    updateTransferProgress(id, 100);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Transfer UI
+// ─────────────────────────────────────────────
+function addTransferItem(id, name, size, direction) {
+  const wrap = document.getElementById('transfers-wrap');
+  const list = document.getElementById('transfers');
+  wrap.style.display = 'block';
+
+  const lbl = direction === 'incoming' ? 'receiving' : 'sending';
+  const lblCls = direction === 'incoming' ? 'incoming-lbl' : 'outgoing-lbl';
+  const fillCls = direction === 'incoming' ? 'incoming-fill' : 'outgoing-fill';
+
+  const el = document.createElement('div');
+  el.className = `transfer-item ${direction}`;
+  el.id = `transfer-${id}`;
+  el.innerHTML = `
+    <div class="transfer-header">
+      <span class="transfer-icon">${fileIcon(name)}</span>
+      <div class="transfer-meta">
+        <div class="transfer-name">${escHtml(name)}</div>
+        <div class="transfer-sub">${formatSize(size)}</div>
+      </div>
+      <span class="transfer-status ${lblCls}" id="status-${id}">${lbl}</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill ${fillCls}" id="fill-${id}" style="width:0%"></div>
+    </div>
+    <div id="action-${id}"></div>
+  `;
+  list.prepend(el);
+  transferMap.set(id, { el, name, size, direction });
+}
+
+function updateTransferProgress(id, pct) {
+  const fill = document.getElementById(`fill-${id}`);
+  if (fill) fill.style.width = pct + '%';
+}
+
+function updateTransferDone(id, blob, name) {
+  updateTransferProgress(id, 100);
+  const status = document.getElementById(`status-${id}`);
+  if (status) { status.textContent = 'done'; status.className = 'transfer-status done-lbl'; }
+  const item = document.getElementById(`transfer-${id}`);
+  if (item) item.className = 'transfer-item done';
+
+  const actionEl = document.getElementById(`action-${id}`);
+  if (actionEl) {
+    const url = URL.createObjectURL(blob);
+    const btn = document.createElement('button');
+    btn.className = 'download-btn';
+    btn.innerHTML = '↓ Save file';
+    btn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+    };
+    actionEl.appendChild(btn);
+  }
+  showToast(`Received: ${name}`, 'success');
+}
+
+// ─────────────────────────────────────────────
+// QR code generation (using free API)
+// ─────────────────────────────────────────────
+function renderQR(code) {
+  const joinUrl = `${location.origin}?join=${code}`;
+  const wrap = document.getElementById('qr-wrap');
+  const img = document.createElement('img');
+  // Use QR Server API — no external lib needed
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=111111&color=e8ff47&qzone=1&data=${encodeURIComponent(joinUrl)}`;
+  img.alt = 'QR code';
+  img.width = 180;
+  img.height = 180;
+  img.onerror = () => { wrap.innerHTML = `<span style="color:var(--muted);font-size:0.72rem">QR unavailable</span>`; };
+  wrap.innerHTML = '';
+  wrap.appendChild(img);
+}
+
+// ─────────────────────────────────────────────
+// Auto-join from URL param
+// ─────────────────────────────────────────────
+function checkAutoJoin() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('join');
+  if (code) {
+    document.getElementById('code-input').value = code.toUpperCase();
+    startJoin(code.toUpperCase());
+  }
+}
+
+// ─────────────────────────────────────────────
+// Actions
+// ─────────────────────────────────────────────
+function startCreate() {
+  myRole = 'creator';
+  showScreen('create');
+  connectWS(() => wsSend({ type: 'create' }));
+}
+
+function startJoin(code) {
+  if (!code) {
+    code = document.getElementById('code-input').value.toUpperCase().trim();
+  }
+  if (code.length < 6) {
+    document.getElementById('join-error').textContent = 'Code must be 6 characters';
+    return;
+  }
+  document.getElementById('join-error').textContent = '';
+  myRole = 'joiner';
+  setBadge('joining', 'connecting');
+  connectWS(() => wsSend({ type: 'join', code }));
+}
+
+function resetSession() {
+  if (dc) { try { dc.close(); } catch(_) {} dc = null; }
+  if (pc) { try { pc.close(); } catch(_) {} pc = null; }
+  if (ws) { try { ws.close(); } catch(_) {} ws = null; }
+  myRole = null;
+  roomCode = null;
+  incomingMeta = null;
+  incomingChunks = [];
+  incomingReceived = 0;
+  transferMap.clear();
+  document.getElementById('transfers').innerHTML = '';
+  document.getElementById('transfers-wrap').style.display = 'none';
+  document.getElementById('disconnected-banner').classList.remove('visible');
+  document.getElementById('drop-zone').style.pointerEvents = '';
+  document.getElementById('drop-zone').style.opacity = '';
+  document.getElementById('code-input').value = '';
+  setBadge('idle');
+  showScreen('home');
+  // Clean URL
+  history.replaceState({}, '', location.pathname);
+}
+
+// ─────────────────────────────────────────────
+// Event listeners
+// ─────────────────────────────────────────────
+document.getElementById('btn-create').addEventListener('click', startCreate);
+document.getElementById('btn-join-nav').addEventListener('click', () => showScreen('join'));
+document.getElementById('btn-join').addEventListener('click', () => startJoin());
+document.getElementById('back-from-create').addEventListener('click', resetSession);
+document.getElementById('back-from-join').addEventListener('click', () => showScreen('home'));
+document.getElementById('btn-new-session').addEventListener('click', resetSession);
+document.getElementById('clear-transfers').addEventListener('click', () => {
+  document.getElementById('transfers').innerHTML = '';
+  document.getElementById('transfers-wrap').style.display = 'none';
+  transferMap.clear();
+});
+
+document.getElementById('code-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startJoin();
+});
+
+// File input / drop
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  sendFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', () => {
+  sendFiles([...fileInput.files]);
+  fileInput.value = '';
+});
+
+// Install prompt
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+  document.getElementById('install-banner').classList.add('visible');
+});
+document.getElementById('install-btn').addEventListener('click', async () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  const { outcome } = await deferredInstall.userChoice;
+  if (outcome === 'accepted') document.getElementById('install-banner').classList.remove('visible');
+  deferredInstall = null;
+});
+
+// ─────────────────────────────────────────────
+// Utils
+// ─────────────────────────────────────────────
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.className = '', 3000);
+}
+
+function formatSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b/1048576).toFixed(1) + ' MB';
+  return (b/1073741824).toFixed(2) + ' GB';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  const m = { pdf:'📄',png:'🖼',jpg:'🖼',jpeg:'🖼',gif:'🖼',webp:'🖼',svg:'🖼',mp4:'🎬',mov:'🎬',avi:'🎬',mkv:'🎬',webm:'🎬',mp3:'🎵',wav:'🎵',flac:'🎵',m4a:'🎵',zip:'📦',tar:'📦',gz:'📦',rar:'📦',js:'💻',ts:'💻',py:'💻',sh:'💻',json:'💻',txt:'📝',md:'📝',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',csv:'📊' };
+  return m[ext] || '📁';
+}
+
+// Service Worker
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+// Init
+checkAutoJoin();
+</script>
+</body>
+</html>

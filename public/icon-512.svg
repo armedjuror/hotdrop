@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#0a0a0a" rx="80"/>
+  <rect x="40" y="40" width="432" height="432" fill="none" stroke="#222" stroke-width="2"/>
+  <path d="M256 130 L190 210 L222 210 L222 270 L290 270 L290 210 L322 210 Z" fill="#e8ff47"/>
+  <rect x="140" y="300" width="232" height="10" fill="#e8ff47" rx="5"/>
+  <circle cx="160" cy="348" r="12" fill="#47c8ff"/>
+  <circle cx="256" cy="348" r="12" fill="#47c8ff"/>
+  <circle cx="352" cy="348" r="12" fill="#47c8ff"/>
+  <text x="256" y="418" text-anchor="middle" font-family="monospace" font-size="36" fill="#333" letter-spacing="6">LOCAL</text>
+</svg>
