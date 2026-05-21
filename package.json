@@ -1,16 +1,44 @@
 {
-  "name": "hotdrop-webrtc",
+  "name": "hotdrop",
   "version": "1.0.0",
-  "description": "P2P file transfer via WebRTC — no installs, just open a URL",
+  "description": "P2P LAN & internet file sharing via WebRTC — no cloud, no installs, just a URL",
   "main": "signaling/server.js",
-  "scripts": {
-    "start": "node signaling/server.js"
-  },
   "bin": {
     "hotdrop": "./cli.js"
   },
-  "keywords": ["webrtc", "file-transfer", "p2p", "hotdrop"],
+  "files": [
+    "cli.js",
+    "local_install.sh",
+    "signaling/server.js",
+    "signaling/package.json",
+    "public/"
+  ],
+  "scripts": {
+    "start": "node signaling/server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": [
+    "webrtc",
+    "p2p",
+    "file-transfer",
+    "lan",
+    "local",
+    "hotdrop",
+    "file-sharing",
+    "peer-to-peer"
+  ],
+  "author": "armedjuror",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/armedjuror/hotdrop.git"
+  },
+  "homepage": "https://github.com/armedjuror/hotdrop#readme",
+  "bugs": {
+    "url": "https://github.com/armedjuror/hotdrop/issues"
+  },
   "dependencies": {
     "express": "^5.2.1",
     "ws": "^8.18.2"

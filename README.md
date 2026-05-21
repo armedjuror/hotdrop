@@ -1,42 +1,55 @@
-# HotDrop 🔥
+# HotDrop
 
-> P2P file sharing between any devices — no cloud, no cables, no installs. Just open a URL.
+[![npm version](https://img.shields.io/npm/v/hotdrop)](https://www.npmjs.com/package/hotdrop)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D16-brightgreen)](https://nodejs.org)
 
-Files transfer **directly between browsers** via WebRTC. Nothing touches the server. Supports multiple peers in the same room, and rooms stay alive for 5 minutes after the last peer disconnects so anyone can rejoin.
+> Serverless P2P file sharing — no cloud, no installs, just a URL.
+
+Files transfer **directly between browsers** via WebRTC. The server only brokers the initial handshake — it never sees your files. Supports multiple peers per room, works across any network, and runs offline on a local LAN with zero internet usage.
+
+**[Try it live](https://hotdrop.armedjuror.in)** · [npm](https://www.npmjs.com/package/hotdrop) · [Buy me a coffee](https://buymeacoffee.com/armedjuror)
+
+---
+
+## Table of Contents
+
+- [How it works](#how-it-works)
+- [Installation](#installation)
+  - [Global CLI (local network)](#global-cli-local-network)
+  - [Self-hosted server](#self-hosted-server)
+- [CLI reference](#cli-reference)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
 ## How it works
 
-1. Open the app → tap **Create Room** → get a 6-digit code + QR
-2. Other devices scan the QR or tap **Join with Code**
-3. WebRTC connection established directly between browsers
-4. Any device can send files — they download instantly on the other side
+1. Open the app → tap **Create Room** → share the 6-character code or QR
+2. Other devices scan the QR or enter the code
+3. A direct WebRTC connection is established between all peers
+4. Any peer can send files — recipients get an instant in-browser download prompt
 
-Files live in RAM only. Nothing is stored on the server.
+Files exist only in browser memory. Nothing is written to disk or stored on the server.
 
 ---
 
-## Deployment
+## Installation
 
-### Self-hosted server (VPS / cloud)
+### Global CLI (local network)
 
-The `signaling/` folder contains the full server — it serves the frontend and handles WebSocket signaling.
+Install globally via npm to run HotDrop as a background service on your machine. All traffic stays on your LAN — zero internet data consumed.
 
 ```bash
-git clone https://github.com/armedjuror/hotdrop
-cd hotdrop/signaling
-npm install
-node server.js
+npm install -g hotdrop
+hotdrop start
 ```
 
-Set a `PORT` environment variable if needed (defaults to `5821`).
-
-For production, run it behind a reverse proxy (nginx/caddy) with TLS so the client can use `wss://`.
-
-### Local network install
-
-For intra-network transfers — zero internet, files never leave your LAN.
+Or install from source:
 
 ```bash
 git clone https://github.com/armedjuror/hotdrop
@@ -44,76 +57,106 @@ cd hotdrop
 bash local_install.sh
 ```
 
-This installs the `hotdrop` command globally. Then:
+Once running, open `http://<YOUR_LOCAL_IP>:5821` on any device on the same network. The QR code on the create screen automatically encodes the server's LAN IP so other devices can scan and join immediately.
+
+The UI shows a **HotDrop.local** label when connected to a local server.
+
+### Self-hosted server
+
+To run HotDrop on a VPS or cloud server (accessible over the internet):
 
 ```bash
-hotdrop start     # starts server in background (survives terminal close)
-hotdrop stop      # stops the server
-hotdrop status    # check if running
-hotdrop logs      # view server logs
-hotdrop uninstall # stop and clean up
+git clone https://github.com/armedjuror/hotdrop
+cd hotdrop
+npm install
+npm start
 ```
 
-Open `http://YOUR_LOCAL_IP:5821` on any device on the same network. The QR code on the create screen automatically encodes the server's LAN IP — just scan to join.
+Set the `PORT` environment variable if needed (defaults to `5821`). For production, place it behind a reverse proxy (nginx, Caddy) with TLS — the client requires `wss://` on HTTPS origins.
+
+---
+
+## CLI reference
+
+```
+hotdrop start      Start the server in the background (survives terminal close)
+hotdrop stop       Stop the server
+hotdrop status     Check whether the server is running
+hotdrop logs       View server logs
+hotdrop uninstall  Stop the server and remove temp files
+```
 
 ---
 
 ## Architecture
 
 ```
-Browser A  ──── WebRTC DataChannel (direct P2P) ────  Browser B
-    │                                                       │
-    │                                                  Browser C
-    │                                                       │
-    └──────────── WebSocket (signaling only) ───────────────┘
-                        Signaling server
-                   (never sees your files)
+Browser A ──── WebRTC DataChannel (direct P2P) ──── Browser B
+    │                                                     │
+    │                                               Browser C
+    │                                                     │
+    └────────── WebSocket (signaling only) ───────────────┘
+                       Signaling server
+                  (never sees your files)
 ```
 
-The server only exchanges WebRTC handshake messages (offer/answer/ICE candidates). Once peers are connected, the server is out of the picture. Multiple peers can share the same room — each pair maintains a direct P2P connection.
+The signaling server exchanges only WebRTC handshake messages (offer/answer/ICE candidates). Once peers are connected, the server plays no further role.
+
+Each pair of peers maintains its own direct P2P connection (mesh topology). Sending a file broadcasts it to all connected peers simultaneously — each peer receives a full independent copy.
 
 ---
 
 ## Features
 
-- No installs — just a URL
-- Works from any device with a browser
-- Files never leave your devices — pure P2P
+- No client installs — works in any modern browser
+- Pure P2P — files never touch the server
 - Multi-peer rooms — send to multiple devices at once
-- Rooms persist for 5 minutes after disconnect — rejoin without recreating
-- QR code encodes LAN IP on local server for instant scanning
-- Installable as a PWA on iPhone, Android, Mac
-- `.local` branding when running on a local server
+- Room grace period — rooms stay alive for 5 minutes after the last peer disconnects, allowing rejoin without recreating
+- LAN mode — run locally for zero-internet intra-network transfers
+- QR code auto-encodes the server's LAN IP when running locally
+- Installable as a PWA on iOS, Android, and desktop
+- Single-file frontend — no build step, no bundler
+
+---
 
 ## Limitations
 
-- All peers must have the browser open simultaneously
-- Multi-peer sends one full copy per peer — a 1 GB file to 3 peers costs 2 GB upload
-- Very large files (>1 GB) may be slow depending on device RAM
-- No TURN relay — if direct P2P fails (rare), there is no fallback
-- Safari on iOS: WebRTC works on Safari 16+
+- All peers must have the page open simultaneously (no store-and-forward)
+- Multi-peer upload cost: a 1 GB file sent to 3 peers uses 2 GB of upload
+- Large files (>1 GB) may be constrained by device RAM
+- No TURN relay — if NAT traversal fails, there is no fallback
+- WebRTC on iOS requires Safari 16+ or any browser on iOS 16+
 
 ---
 
 ## Contributing
 
-Contributions are welcome. A few guidelines:
+Contributions are welcome. Please open an issue first for significant changes so the approach can be discussed before a PR is submitted.
 
-- Keep it dependency-light — the server is intentionally minimal (express + ws only)
-- No build step — the frontend is a single `index.html`, keep it that way
-- Test on at least two real devices before submitting a PR
-- Open an issue first for large changes so we can discuss the approach
+**Guidelines:**
+
+- Keep the server minimal — `express` and `ws` are the only dependencies by design
+- The frontend is a single `index.html` with no build step — keep it that way
+- Test on at least two real devices (not just two browser tabs) before submitting
+- Follow existing code style — no linters are enforced, but consistency matters
+
+**Development setup:**
 
 ```bash
-# Run locally for dev
-cd hotdrop/signaling
+git clone https://github.com/armedjuror/hotdrop
+cd hotdrop
 npm install
-node server.js
-# Open http://localhost:5821 in two tabs or two devices on the same network
+npm start
+# Open http://localhost:5821 in two tabs or on two devices on the same network
 ```
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes
+4. Open a pull request against `main`
 
 ---
 
 ## License
 
-MIT
+[MIT](LICENSE)
