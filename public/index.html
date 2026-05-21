@@ -851,6 +851,7 @@ function onPeerDisconnected(peerId) {
   const stillConnected = [...peers.values()].filter(p => p.dc && p.dc.readyState === 'open').length;
   if (stillConnected === 0) {
     setBadge('disconnected', 'error');
+    document.getElementById('peer-info-text').innerHTML = `Connected · <strong>0 peers</strong>`;
     document.getElementById('disconnected-banner').classList.add('visible');
     document.getElementById('drop-zone').style.pointerEvents = 'none';
     document.getElementById('drop-zone').style.opacity = '0.4';

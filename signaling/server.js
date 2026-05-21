@@ -138,5 +138,10 @@ wss.on('connection', ws => {
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`hotdrop running on port ${PORT}`);
+  const ip = getLocalIP();
+  const url = ip ? `http://${ip}:${PORT}` : `http://localhost:${PORT}`;
+  // OSC 8 hyperlink — clickable in iTerm2, modern Terminal.app, VS Code terminal, etc.
+  const link = `\x1b]8;;${url}\x07${url}\x1b]8;;\x07`;
+  console.log(`\n  HotDrop is running\n`);
+  console.log(`  \x1b[36m${link}\x1b[0m\n`);
 });
