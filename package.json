@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "P2P LAN & internet file sharing via WebRTC — no cloud, no installs, just a URL",
   "main": "signaling/server.js",
+  "preferGlobal": true,
   "bin": {
     "hotdrop": "./cli.js"
   },
