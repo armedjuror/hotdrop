@@ -16,7 +16,7 @@ app.get('/status', (req, res) => {
 });
 
 // Fallback to index.html for any unmatched route (PWA deep links)
-app.get('*splat, (req, res) => {
+app.get('*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
