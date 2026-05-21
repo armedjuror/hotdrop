@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node signaling/server.js"
   },
+  "bin": {
+    "hotdrop": "./cli.js"
+  },
   "keywords": ["webrtc", "file-transfer", "p2p", "hotdrop"],
   "license": "MIT",
   "dependencies": {

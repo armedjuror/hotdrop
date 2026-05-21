@@ -67,6 +67,7 @@
 
     .logo { font-family: var(--sans); font-weight: 800; font-size: 1.4rem; letter-spacing: -0.03em; }
     .logo span { color: var(--accent); }
+    .logo em { font-style: normal; font-size: 0.7rem; font-family: var(--mono); color: var(--muted); letter-spacing: 0.04em; vertical-align: middle; margin-left: 4px; opacity: 0.85; }
 
     .conn-badge {
       font-size: 0.62rem;
@@ -165,10 +166,10 @@
     }
 
     .room-code {
-      font-family: var(--sans);
+      font-family: var(--mono);
       font-size: 2.8rem;
-      font-weight: 800;
-      letter-spacing: 0.18em;
+      font-weight: 700;
+      letter-spacing: 0.22em;
       color: var(--accent);
       text-align: center;
       margin-bottom: 20px;
@@ -221,10 +222,10 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 16px;
-      font-family: var(--sans);
+      font-family: var(--mono);
       font-size: 2rem;
-      font-weight: 800;
-      letter-spacing: 0.2em;
+      font-weight: 700;
+      letter-spacing: 0.22em;
       color: var(--accent);
       text-align: center;
       text-transform: uppercase;
@@ -454,6 +455,62 @@
         justify-content: space-between;
       }
     }
+
+    /* ── Transfer screen room bar ── */
+    .room-info-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 20px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .room-info-bar strong {
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.15em;
+      margin-left: 6px;
+    }
+
+    /* ── QR modal ── */
+    .qr-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-modal.visible { display: flex; }
+    .qr-modal-inner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .qr-modal-code {
+      font-family: var(--mono);
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+    }
+    .qr-modal-hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
@@ -522,13 +579,21 @@
     <!-- ── Screen: Transfer ── -->
     <div class="screen" id="screen-transfer">
       <div class="disconnected-banner" id="disconnected-banner">
-        <span>⚠ Peer disconnected</span>
-        <button class="btn-sm-ghost" id="btn-new-session">New session</button>
+        <span>⚠ All peers disconnected</span>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button class="btn-sm-ghost" id="btn-new-session">New session</button>
+          <button class="btn-sm-ghost" id="btn-dismiss-banner" style="padding:5px 8px">✕</button>
+        </div>
       </div>
 
       <div class="peer-info" id="peer-info">
         <span class="peer-dot"></span>
-        <span>Connected · <strong>peer ready</strong></span>
+        <span id="peer-info-text">Connected · <strong>1 peer</strong></span>
+      </div>
+
+      <div class="room-info-bar" id="room-info-bar">
+        <span>Room:<strong id="transfer-room-code">——</strong></span>
+        <button class="btn-sm-ghost" id="btn-show-qr">show QR</button>
       </div>
 
       <div class="drop-zone" id="drop-zone">
@@ -547,6 +612,15 @@
       </div>
     </div>
   </main>
+</div>
+
+<div class="qr-modal" id="qr-modal">
+  <div class="qr-modal-inner">
+    <div class="qr-modal-code" id="qr-modal-code">——</div>
+    <div id="qr-modal-img"></div>
+    <p class="qr-modal-hint">Scan to join this room</p>
+    <button class="btn-sm-ghost" id="qr-modal-close">close</button>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -568,13 +642,17 @@
 // ─────────────────────────────────────────────
 // Config — auto-detects same-origin (Railway) or localhost for dev
 // ─────────────────────────────────────────────
-const WS_URL = (() => {
+const { WS_URL, IS_LOCAL } = (() => {
   const host = window.location.hostname;
-  
-  
-  if (host === 'localhost' || host === '127.0.0.1') return 'ws://localhost:8080';
-  return `wss://${host}`;  // same-origin deploy on Railway
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || /^192\.168\./.test(host) || /^10\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  const proto = isLocal ? 'ws' : 'wss';
+  const port = isLocal ? `:${window.location.port || 5821}` : '';
+  return { WS_URL: `${proto}://${host}${port}`, IS_LOCAL: isLocal };
 })();
+
+if (IS_LOCAL) {
+  document.querySelector('.logo').innerHTML = 'Hot<span>Drop</span><em>.local</em>';
+}
 
 const CHUNK_SIZE = 64 * 1024; // 64KB chunks
 
@@ -582,8 +660,7 @@ const CHUNK_SIZE = 64 * 1024; // 64KB chunks
 // State
 // ─────────────────────────────────────────────
 let ws = null;
-let pc = null;           // RTCPeerConnection
-let dc = null;           // RTCDataChannel
+const peers = new Map(); // peerId → { pc: RTCPeerConnection, dc: RTCDataChannel | null }
 let myRole = null;       // 'creator' | 'joiner'
 let roomCode = null;
 
@@ -632,7 +709,8 @@ function connectWS(onOpen) {
   };
 
   ws.onclose = () => {
-    if (dc && dc.readyState === 'open') return; // WebRTC already up, WS not needed
+    const anyOpen = [...peers.values()].some(p => p.dc && p.dc.readyState === 'open');
+    if (anyOpen) return; // WebRTC already up, WS not needed
     setBadge('disconnected', 'error');
   };
 }
@@ -654,43 +732,48 @@ async function handleSignal(msg) {
 
     case 'joined':
       roomCode = msg.code;
+      // existing peers will send us offers
       break;
 
-    case 'peer_joined':
-      // Creator: peer joined — initiate WebRTC offer
-      if (myRole === 'creator') {
-        setBadge('connecting', 'connecting');
-        await createPeerConnection();
-        dc = pc.createDataChannel('hotdrop', { ordered: true });
-        setupDataChannel(dc);
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        wsSend({ type: 'offer', sdp: offer.sdp });
-      }
+    case 'peer_joined': {
+      // Any peer already in the room creates an offer to the new joiner
+      setBadge('connecting', 'connecting');
+      const pc = await createPeerConnection(msg.peerId);
+      const dc = pc.createDataChannel('hotdrop', { ordered: true });
+      setupDataChannel(dc, msg.peerId);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      wsSend({ type: 'offer', sdp: offer.sdp, to: msg.peerId });
       break;
+    }
 
-    case 'offer':
-      // Joiner: got offer — answer it
-      await createPeerConnection();
+    case 'offer': {
+      // Got an offer from msg.from — answer it
+      const pc = await createPeerConnection(msg.from);
       await pc.setRemoteDescription({ type: 'offer', sdp: msg.sdp });
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      wsSend({ type: 'answer', sdp: answer.sdp });
-      pc.ondatachannel = e => { dc = e.channel; setupDataChannel(dc); };
+      wsSend({ type: 'answer', sdp: answer.sdp, to: msg.from });
+      pc.ondatachannel = e => setupDataChannel(e.channel, msg.from);
       break;
+    }
 
-    case 'answer':
-      await pc.setRemoteDescription({ type: 'answer', sdp: msg.sdp });
+    case 'answer': {
+      const entry = peers.get(msg.from);
+      if (entry) await entry.pc.setRemoteDescription({ type: 'answer', sdp: msg.sdp });
       break;
+    }
 
-    case 'ice':
-      if (msg.candidate && pc) {
-        try { await pc.addIceCandidate(msg.candidate); } catch (_) {}
+    case 'ice': {
+      const entry = peers.get(msg.from);
+      if (entry && msg.candidate) {
+        try { await entry.pc.addIceCandidate(msg.candidate); } catch (_) {}
       }
       break;
+    }
 
     case 'peer_left':
-      onPeerDisconnected();
+      onPeerDisconnected(msg.peerId);
       break;
 
     case 'error':
@@ -703,48 +786,77 @@ async function handleSignal(msg) {
 // ─────────────────────────────────────────────
 // WebRTC
 // ─────────────────────────────────────────────
-async function createPeerConnection() {
-  pc = new RTCPeerConnection({
+async function createPeerConnection(peerId) {
+  const pc = new RTCPeerConnection({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' }
     ]
   });
 
+  peers.set(peerId, { pc, dc: null });
+
   pc.onicecandidate = e => {
-    if (e.candidate) wsSend({ type: 'ice', candidate: e.candidate });
+    if (e.candidate) wsSend({ type: 'ice', candidate: e.candidate, to: peerId });
   };
 
   pc.onconnectionstatechange = () => {
     if (pc.connectionState === 'connected') {
-      setBadge('connected', 'connected');
-    } else if (['disconnected','failed','closed'].includes(pc.connectionState)) {
-      onPeerDisconnected();
+      updateConnBadge();
+    } else if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+      onPeerDisconnected(peerId);
     }
   };
+
+  return pc;
 }
 
-function setupDataChannel(channel) {
+function setupDataChannel(channel, peerId) {
   channel.binaryType = 'arraybuffer';
 
+  const entry = peers.get(peerId);
+  if (entry) entry.dc = channel;
+
   channel.onopen = () => {
-    setBadge('connected', 'connected');
-    showScreen('transfer');
-    showToast('Connected! Ready to send files.', 'success');
+    updateConnBadge();
+    if (!document.getElementById('screen-transfer').classList.contains('active')) {
+      document.getElementById('transfer-room-code').textContent = roomCode;
+      document.getElementById('qr-modal-code').textContent = roomCode;
+      renderQRInto('qr-modal-img', roomCode);
+      showScreen('transfer');
+    }
+    showToast('Peer connected!', 'success');
   };
 
-  channel.onclose = () => onPeerDisconnected();
-
+  channel.onclose = () => onPeerDisconnected(peerId);
   channel.onmessage = e => handleDataMessage(e.data);
 }
 
-function onPeerDisconnected() {
-  setBadge('disconnected', 'error');
-  const banner = document.getElementById('disconnected-banner');
-  banner.classList.add('visible');
-  const dropZone = document.getElementById('drop-zone');
-  dropZone.style.pointerEvents = 'none';
-  dropZone.style.opacity = '0.4';
+function updateConnBadge() {
+  const count = [...peers.values()].filter(p => p.dc && p.dc.readyState === 'open').length;
+  if (count > 0) {
+    setBadge(count === 1 ? '1 peer' : `${count} peers`, 'connected');
+    document.getElementById('peer-info-text').innerHTML =
+      `Connected · <strong>${count} ${count === 1 ? 'peer' : 'peers'}</strong>`;
+  }
+}
+
+function onPeerDisconnected(peerId) {
+  const entry = peers.get(peerId);
+  if (entry) {
+    try { if (entry.dc) entry.dc.close(); } catch (_) {}
+    try { if (entry.pc) entry.pc.close(); } catch (_) {}
+    peers.delete(peerId);
+  }
+  const stillConnected = [...peers.values()].filter(p => p.dc && p.dc.readyState === 'open').length;
+  if (stillConnected === 0) {
+    setBadge('disconnected', 'error');
+    document.getElementById('disconnected-banner').classList.add('visible');
+    document.getElementById('drop-zone').style.pointerEvents = 'none';
+    document.getElementById('drop-zone').style.opacity = '0.4';
+  } else {
+    updateConnBadge();
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -783,7 +895,11 @@ function handleDataMessage(data) {
 // Send files
 // ─────────────────────────────────────────────
 async function sendFiles(files) {
-  if (!dc || dc.readyState !== 'open') {
+  const activeDcs = [...peers.values()]
+    .filter(p => p.dc && p.dc.readyState === 'open')
+    .map(p => p.dc);
+
+  if (activeDcs.length === 0) {
     showToast('Not connected', 'error');
     return;
   }
@@ -792,11 +908,9 @@ async function sendFiles(files) {
     const id = Math.random().toString(36).slice(2, 10);
     addTransferItem(id, file.name, file.size, 'outgoing');
 
-    // Send metadata
-    dc.send(JSON.stringify({
-      type: 'file-start',
-      id, name: file.name, size: file.size, mime: file.type
-    }));
+    // Send metadata to all peers
+    const startMsg = JSON.stringify({ type: 'file-start', id, name: file.name, size: file.size, mime: file.type });
+    for (const dc of activeDcs) dc.send(startMsg);
 
     // Send chunks
     const buffer = await file.arrayBuffer();
@@ -804,12 +918,14 @@ async function sendFiles(files) {
     let sent = 0;
 
     while (offset < buffer.byteLength) {
-      // Backpressure — wait if buffer is too full
-      while (dc.bufferedAmount > 1024 * 1024) {
-        await new Promise(r => setTimeout(r, 20));
+      // Backpressure — wait on all peers
+      for (const dc of activeDcs) {
+        while (dc.bufferedAmount > 1024 * 1024) {
+          await new Promise(r => setTimeout(r, 20));
+        }
       }
       const chunk = buffer.slice(offset, offset + CHUNK_SIZE);
-      dc.send(chunk);
+      for (const dc of activeDcs) dc.send(chunk);
       offset += chunk.byteLength;
       sent += chunk.byteLength;
       const pct = Math.min(100, Math.round(sent / file.size * 100));
@@ -817,7 +933,8 @@ async function sendFiles(files) {
     }
 
     // Send end signal
-    dc.send(JSON.stringify({ type: 'file-end', id }));
+    const endMsg = JSON.stringify({ type: 'file-end', id });
+    for (const dc of activeDcs) dc.send(endMsg);
     updateTransferProgress(id, 100);
   }
 }
@@ -870,6 +987,8 @@ function updateTransferDone(id, blob, name) {
   const actionEl = document.getElementById(`action-${id}`);
   if (actionEl) {
     const url = URL.createObjectURL(blob);
+    const entry = transferMap.get(id);
+    if (entry) entry.url = url;
     const btn = document.createElement('button');
     btn.className = 'download-btn';
     btn.innerHTML = '↓ Save file';
@@ -887,18 +1006,33 @@ function updateTransferDone(id, blob, name) {
 // ─────────────────────────────────────────────
 // QR code generation (using free API)
 // ─────────────────────────────────────────────
+function renderQRInto(containerId, code) {
+  const wrap = document.getElementById(containerId);
+  const doRender = (origin) => {
+    const joinUrl = `${origin}?join=${code}`;
+    const img = document.createElement('img');
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=111111&color=e8ff47&qzone=1&data=${encodeURIComponent(joinUrl)}`;
+    img.alt = 'QR code';
+    img.width = 180;
+    img.height = 180;
+    img.onerror = () => { wrap.innerHTML = `<span style="color:var(--muted);font-size:0.72rem">QR unavailable</span>`; };
+    wrap.innerHTML = '';
+    wrap.appendChild(img);
+  };
+
+  const host = location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    fetch('/api/local-ip')
+      .then(r => r.json())
+      .then(({ ip }) => doRender(ip ? `http://${ip}:${location.port || 5821}` : location.origin))
+      .catch(() => doRender(location.origin));
+  } else {
+    doRender(location.origin);
+  }
+}
+
 function renderQR(code) {
-  const joinUrl = `${location.origin}?join=${code}`;
-  const wrap = document.getElementById('qr-wrap');
-  const img = document.createElement('img');
-  // Use QR Server API — no external lib needed
-  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=111111&color=e8ff47&qzone=1&data=${encodeURIComponent(joinUrl)}`;
-  img.alt = 'QR code';
-  img.width = 180;
-  img.height = 180;
-  img.onerror = () => { wrap.innerHTML = `<span style="color:var(--muted);font-size:0.72rem">QR unavailable</span>`; };
-  wrap.innerHTML = '';
-  wrap.appendChild(img);
+  renderQRInto('qr-wrap', code);
 }
 
 // ─────────────────────────────────────────────
@@ -937,14 +1071,18 @@ function startJoin(code) {
 }
 
 function resetSession() {
-  if (dc) { try { dc.close(); } catch(_) {} dc = null; }
-  if (pc) { try { pc.close(); } catch(_) {} pc = null; }
-  if (ws) { try { ws.close(); } catch(_) {} ws = null; }
+  for (const { pc, dc } of peers.values()) {
+    try { if (dc) dc.close(); } catch (_) {}
+    try { if (pc) pc.close(); } catch (_) {}
+  }
+  peers.clear();
+  if (ws) { try { ws.close(); } catch (_) {} ws = null; }
   myRole = null;
   roomCode = null;
   incomingMeta = null;
   incomingChunks = [];
   incomingReceived = 0;
+  transferMap.forEach(entry => { if (entry.url) URL.revokeObjectURL(entry.url); });
   transferMap.clear();
   document.getElementById('transfers').innerHTML = '';
   document.getElementById('transfers-wrap').style.display = 'none';
@@ -967,7 +1105,20 @@ document.getElementById('btn-join').addEventListener('click', () => startJoin())
 document.getElementById('back-from-create').addEventListener('click', resetSession);
 document.getElementById('back-from-join').addEventListener('click', () => showScreen('home'));
 document.getElementById('btn-new-session').addEventListener('click', resetSession);
+document.getElementById('btn-dismiss-banner').addEventListener('click', () => {
+  document.getElementById('disconnected-banner').classList.remove('visible');
+});
+document.getElementById('btn-show-qr').addEventListener('click', () => {
+  document.getElementById('qr-modal').classList.add('visible');
+});
+document.getElementById('qr-modal-close').addEventListener('click', () => {
+  document.getElementById('qr-modal').classList.remove('visible');
+});
+document.getElementById('qr-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('visible');
+});
 document.getElementById('clear-transfers').addEventListener('click', () => {
+  transferMap.forEach(entry => { if (entry.url) URL.revokeObjectURL(entry.url); });
   document.getElementById('transfers').innerHTML = '';
   document.getElementById('transfers-wrap').style.display = 'none';
   transferMap.clear();

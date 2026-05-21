@@ -2,8 +2,18 @@ const { WebSocketServer } = require('ws');
 const http = require('http');
 const express = require('express');
 const path = require('path');
+const os = require('os');
 
-const PORT = process.env.PORT || 8080;
+function getLocalIP() {
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const iface of ifaces) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+    }
+  }
+  return null;
+}
+
+const PORT = process.env.PORT || 5821;
 
 const app = express();
 
@@ -15,6 +25,11 @@ app.get('/status', (req, res) => {
   res.json({ status: 'hotdrop online', rooms: rooms.size });
 });
 
+// Local IP — used by the client to generate a scannable QR when running on localhost
+app.get('/api/local-ip', (req, res) => {
+  res.json({ ip: getLocalIP() });
+});
+
 // Fallback to index.html for any unmatched route (PWA deep links)
 app.get('*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
@@ -23,8 +38,9 @@ app.get('*splat', (req, res) => {
 const httpServer = http.createServer(app);
 const wss = new WebSocketServer({ server: httpServer });
 
-// rooms: Map<roomCode, Set<ws>>
+// rooms: Map<roomCode, { peers: Set<ws>, timer: ReturnType<typeof setTimeout> | null }>
 const rooms = new Map();
+const ROOM_TTL = 5 * 60 * 1000; // 5-minute grace period after last peer leaves
 
 function generateCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -34,9 +50,10 @@ function send(ws, data) {
   if (ws.readyState === 1) ws.send(JSON.stringify(data));
 }
 
-function broadcast(room, data, exclude = null) {
-  if (!rooms.has(room)) return;
-  for (const peer of rooms.get(room)) {
+function broadcast(roomCode, data, exclude = null) {
+  const room = rooms.get(roomCode);
+  if (!room) return;
+  for (const peer of room.peers) {
     if (peer !== exclude) send(peer, data);
   }
 }
@@ -54,7 +71,7 @@ wss.on('connection', ws => {
       case 'create': {
         let code = generateCode();
         while (rooms.has(code)) code = generateCode();
-        rooms.set(code, new Set([ws]));
+        rooms.set(code, { peers: new Set([ws]), timer: null });
         ws.room = code;
         send(ws, { type: 'created', code, peerId: ws.peerId });
         console.log(`Room created: ${code}`);
@@ -68,15 +85,17 @@ wss.on('connection', ws => {
           return;
         }
         const room = rooms.get(code);
-        if (room.size >= 2) {
-          send(ws, { type: 'error', message: 'Room is full' });
-          return;
+        // Cancel expiry timer if the room was in grace period
+        if (room.timer) {
+          clearTimeout(room.timer);
+          room.timer = null;
         }
-        room.add(ws);
+        const existingPeerIds = [...room.peers].map(p => p.peerId);
+        room.peers.add(ws);
         ws.room = code;
-        send(ws, { type: 'joined', code, peerId: ws.peerId });
+        send(ws, { type: 'joined', code, peerId: ws.peerId, peers: existingPeerIds });
         broadcast(code, { type: 'peer_joined', peerId: ws.peerId }, ws);
-        console.log(`Peer joined room: ${code}`);
+        console.log(`Peer joined room: ${code} (${room.peers.size} peers)`);
         break;
       }
 
@@ -84,7 +103,17 @@ wss.on('connection', ws => {
       case 'answer':
       case 'ice': {
         if (!ws.room) return;
-        broadcast(ws.room, { ...msg, from: ws.peerId }, ws);
+        const room = rooms.get(ws.room);
+        if (!room) return;
+        const payload = { ...msg, from: ws.peerId };
+        if (msg.to) {
+          // Route to specific peer
+          for (const peer of room.peers) {
+            if (peer.peerId === msg.to) { send(peer, payload); break; }
+          }
+        } else {
+          broadcast(ws.room, payload, ws);
+        }
         break;
       }
     }
@@ -93,11 +122,15 @@ wss.on('connection', ws => {
   ws.on('close', () => {
     if (!ws.room || !rooms.has(ws.room)) return;
     const room = rooms.get(ws.room);
-    room.delete(ws);
-    broadcast(ws.room, { type: 'peer_left' });
-    if (room.size === 0) {
-      rooms.delete(ws.room);
-      console.log(`Room closed: ${ws.room}`);
+    room.peers.delete(ws);
+    broadcast(ws.room, { type: 'peer_left', peerId: ws.peerId });
+    if (room.peers.size === 0) {
+      const code = ws.room;
+      room.timer = setTimeout(() => {
+        rooms.delete(code);
+        console.log(`Room expired: ${code}`);
+      }, ROOM_TTL);
+      console.log(`Room empty, expires in ${ROOM_TTL / 1000}s: ${ws.room}`);
     }
   });
 
