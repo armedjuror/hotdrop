@@ -54,7 +54,7 @@
     }
 
     /* ── Layout ── */
-    .app { position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1; }
+    .app { position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
     header {
       flex-shrink: 0;
@@ -86,6 +86,7 @@
 
     main {
       flex: 1;
+      min-height: 0;
       padding: 24px 20px 40px;
       max-width: 600px;
       width: 100%;
@@ -693,6 +694,7 @@ function setBadge(text, cls) {
 // WebSocket connection to signaling server
 // ─────────────────────────────────────────────
 function connectWS(onOpen) {
+  if (ws) { try { ws.close(); } catch (_) {} ws = null; }
   setBadge('connecting', 'connecting');
   ws = new WebSocket(WS_URL);
 
@@ -1104,7 +1106,11 @@ document.getElementById('btn-create').addEventListener('click', startCreate);
 document.getElementById('btn-join-nav').addEventListener('click', () => showScreen('join'));
 document.getElementById('btn-join').addEventListener('click', () => startJoin());
 document.getElementById('back-from-create').addEventListener('click', resetSession);
-document.getElementById('back-from-join').addEventListener('click', () => showScreen('home'));
+document.getElementById('back-from-join').addEventListener('click', () => {
+  if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+  setBadge('idle');
+  showScreen('home');
+});
 document.getElementById('btn-new-session').addEventListener('click', resetSession);
 document.getElementById('btn-dismiss-banner').addEventListener('click', () => {
   document.getElementById('disconnected-banner').classList.remove('visible');
